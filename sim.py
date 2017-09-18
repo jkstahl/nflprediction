@@ -2,13 +2,14 @@ import nflgame
 import numpy as np
 import random
 import matplotlib.pyplot as plt
-from modeler2 import home_model as team_tracker 
+from statistical_model import home_model as team_tracker 
 from modeler import get_team
 #from prediction_model_ai import prediction_model_ai as team_tracker
 import threading
 import cProfile
-from multiprocessing import Process
 #from prediction_model_ai import prediction_model_ai
+from optparse import OptionParser
+
 
 #prediction_model_ai(10)
 
@@ -17,7 +18,7 @@ from multiprocessing.dummy import Pool
 DEBUG = True
 np.random.seed(2)
 
-SIMS = 100
+SIMS = 1000
 
 games_cache = {}
 
@@ -93,6 +94,12 @@ def main():
     TESTS = 20
     RANDOM = False
 
+    parser = OptionParser()
+    parser.add_option("-p", "--predict_week", dest="predict_week", help="Predict all games for the given week in the form. year-week", default=None)
+    parser.add_option('-g', '--go_back', dest='go_back', type='int', help='The amount of time (in NFL weeks) to accumulate stats for the prediction model 15-19 is good.', default=19)
+    parser.add_option("-s", "--simulation", action="store_true", dest="simulation", default=False, help="Run back testing simulation.")    
+    (options, args) = parser.parse_args()
+
     '''
     team_stats = team_tracker()
     team_stats.process_history(2013, 2013, 1, 17)
@@ -100,73 +107,72 @@ def main():
     return 0 
     '''
     
-    #team_stats = team_tracker()
-    #team_stats.process_history(2016, 2016, 1, 17)
-    #print (str(team_stats.play_match('SEA','GB', None, None, 10000)))
+    if options.predict_week != None:
+        year, week = options.predict_week.split('-')
+        year, week = int(year) , int(week)
+        print ('Predicting all games for year: %d, week %d' % (year, week))
+        error, accuacy = predict_week(year, week, options.go_back, True)
+        print ('Results: error %.2f, accuracy %.3f' % (error, accuacy))
     
-    print(predict_week(2017, 2, 19, True))
-    return 0
-    
-    
-
-    go_backs = range(4, 20, 2)
-    acs = []
-    weeks_acc = np.array([0.0] * 17)
-    dates_acc = np.array([0.0] * (END_YEAR-START_YEAR + 1)*WEEKS_PER_SEASON)
-    
-    dates_total = np.array([0.0] * (END_YEAR-START_YEAR + 1)*WEEKS_PER_SEASON)
-    weeks_total = np.array([0.0] * 17)
-    
-    model = team_tracker()
-    
-    for go_back in go_backs:
-        week_range = (END_YEAR-START_YEAR + 1)*WEEKS_PER_SEASON - go_back
-        num_tests = TESTS if RANDOM else week_range 
-        print ('Number of weeks of sim %d' % week_range)
-        accuracy = 0
-        j = 1
+    if options.simulation:    
+        go_backs = range(4, 20, 2)
+        acs = []
+        weeks_acc = np.array([0.0] * 17)
+        dates_acc = np.array([0.0] * (END_YEAR-START_YEAR + 1)*WEEKS_PER_SEASON)
         
-        for i in range(num_tests):
-            if RANDOM:
-                raw_week = random.randrange(0, week_range) + 1
-            else:
-                raw_week = j
-                j+=1
-            year = START_YEAR + ((raw_week + go_back) / WEEKS_PER_SEASON)
-            week = (raw_week + go_back) % WEEKS_PER_SEASON + 1
+        dates_total = np.array([0.0] * (END_YEAR-START_YEAR + 1)*WEEKS_PER_SEASON)
+        weeks_total = np.array([0.0] * 17)
+        
+        model = team_tracker()
+        
+        for go_back in go_backs:
+            week_range = (END_YEAR-START_YEAR + 1)*WEEKS_PER_SEASON - go_back
+            num_tests = TESTS if RANDOM else week_range 
+            print ('Number of weeks of sim %d' % week_range)
+            accuracy = 0
+            j = 1
             
-            #print ('Year: %d, Week: %d' % (year, week))
-            error, percentage = predict_week(year, week, go_back, False, model)
-            #error, percentage = predict_week(year, week, go_back)
-            print ('Error: %.2f, Percentage: %.2f' % (error, percentage))
-            accuracy += percentage
-            weeks_acc[week-1] += percentage
-            weeks_total[week-1] += 1
-            
-            dates_acc[raw_week-1 + go_back] += percentage
-            dates_total[raw_week-1 + go_back] += 1
-            
-            i+=1
-        ave_ac = accuracy / num_tests
-        acs.append(ave_ac)
-        print ('Total: %.2f' % (ave_ac))
-    
-    print ('Accuracy by week:') 
-    plt.figure(1)
-    plt.title('Accuracy by week')
-    week_accuracy = weeks_acc/weeks_total
-    plt.plot(week_accuracy)   
-    print (str(weeks_acc/weeks_total))
-    print ('total accuracy: %s' %str(acs))
-    plt.figure(2)
-    plt.title('Accuracy by go back')
-    plt.plot(go_backs, acs)
-    
-    plt.figure(3)
-    plt.title('Date accuracy')
-    date_acc_ave = dates_acc / dates_total
-    plt.plot(date_acc_ave)
-    plt.show()
+            for i in range(num_tests):
+                if RANDOM:
+                    raw_week = random.randrange(0, week_range) + 1
+                else:
+                    raw_week = j
+                    j+=1
+                year = START_YEAR + ((raw_week + go_back) / WEEKS_PER_SEASON)
+                week = (raw_week + go_back) % WEEKS_PER_SEASON + 1
+                
+                #print ('Year: %d, Week: %d' % (year, week))
+                error, percentage = predict_week(year, week, go_back, False, model)
+                #error, percentage = predict_week(year, week, go_back)
+                print ('Error: %.2f, Percentage: %.2f' % (error, percentage))
+                accuracy += percentage
+                weeks_acc[week-1] += percentage
+                weeks_total[week-1] += 1
+                
+                dates_acc[raw_week-1 + go_back] += percentage
+                dates_total[raw_week-1 + go_back] += 1
+                
+                i+=1
+            ave_ac = accuracy / num_tests
+            acs.append(ave_ac)
+            print ('Total: %.2f' % (ave_ac))
+        
+        print ('Accuracy by week:') 
+        plt.figure(1)
+        plt.title('Accuracy by week')
+        week_accuracy = weeks_acc/weeks_total
+        plt.plot(week_accuracy)   
+        print (str(weeks_acc/weeks_total))
+        print ('total accuracy: %s' %str(acs))
+        plt.figure(2)
+        plt.title('Accuracy by go back')
+        plt.plot(go_backs, acs)
+        
+        plt.figure(3)
+        plt.title('Date accuracy')
+        date_acc_ave = dates_acc / dates_total
+        plt.plot(date_acc_ave)
+        plt.show()
     
 if __name__ ==  '__main__':
     main()
