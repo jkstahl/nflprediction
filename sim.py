@@ -2,51 +2,46 @@ import nflgame
 import numpy as np
 import random
 import matplotlib.pyplot as plt
-from statistical_model import home_model as team_tracker 
+from statistical_model import home_model as stat_model 
+from ai_model import prediction_model_ai as ai_model
 from modeler import get_team
-#from prediction_model_ai import prediction_model_ai as team_tracker
 import threading
 import cProfile
 #from prediction_model_ai import prediction_model_ai
 from optparse import OptionParser
-
-
-#prediction_model_ai(10)
-
 from multiprocessing.dummy import Pool 
 
-DEBUG = True
+models = {'stat' : stat_model, 'ai' : ai_model}
+
 np.random.seed(2)
-
 SIMS = 1000
-
 games_cache = {}
 
 
-def eval_prediction(game, prediction_home, prediction_away, winner):
+def eval_prediction(game, prediction_home, prediction_away, winner, print_it=False):
     actual_winner = get_team(game.winner)
     correct = actual_winner==winner
-    if DEBUG:
+    if print_it:
         print 'PREDICTED: %s ACTUAL %s - %s' % (winner, actual_winner,correct)
     return (((game.score_home-prediction_home)**2)+((game.score_away-prediction_away)**2), correct)
 
 
-def eval_games(games, predictions):
+def eval_games(games, predictions, print_it=False):
+    if print_it:
+        print ('Results:')
     error_sum = 0
     correct_sum = 0
     for game in games:
-        
         home, away, winner = predictions[get_team(game.home)]
-        error, correct = eval_prediction(game, home, away, winner)
+        error, correct = eval_prediction(game, home, away, winner, print_it)
         error_sum += error
         correct_sum += int(correct)
     return (1.0 * error_sum / len(predictions)/2, 1.0 * correct_sum / len(predictions))
 
 
-def predict_week(season, week, go_back, print_it = False, team_stats = None):
-    print 'season: %d, week: %d' % (season, week)
-    if team_stats == None:
-        team_stats = team_tracker()
+def predict_week(season, week, go_back, team_stats, print_it = False):
+    print ('season: %d, week: %d' % (season, week))
+    
     # get history up to and including week - go_back
     week_delta = (week - go_back)
     from_year = season - abs(week_delta) / 17 
@@ -79,8 +74,8 @@ def predict_week(season, week, go_back, print_it = False, team_stats = None):
         games = nflgame.games(year, week)
         games_cache[(year, week)] = games
     
-        
-    return eval_games(games, predictions)
+    
+    return eval_games(games, predictions, print_it)
     
 def prediction_wrapper(args):
     return predict_week(*args)
@@ -97,7 +92,9 @@ def main():
     parser = OptionParser()
     parser.add_option("-p", "--predict_week", dest="predict_week", help="Predict all games for the given week in the form. year-week", default=None)
     parser.add_option('-g', '--go_back', dest='go_back', type='int', help='The amount of time (in NFL weeks) to accumulate stats for the prediction model 15-19 is good.', default=19)
+    parser.add_option("-m", "--model", dest="model", help="Model type to use.  stat or ai", default='stat')
     parser.add_option("-s", "--simulation", action="store_true", dest="simulation", default=False, help="Run back testing simulation.")    
+    parser.add_option("-v", "--verbose", action="store_true", dest="verbose", default=False, help="Run back testing simulation.")  
     (options, args) = parser.parse_args()
 
     '''
@@ -106,12 +103,12 @@ def main():
     print (str(team_stats.play_match('SEA','GB', None, None, 10000)))
     return 0 
     '''
-    
+    model = models[options.model]()
     if options.predict_week != None:
         year, week = options.predict_week.split('-')
         year, week = int(year) , int(week)
         print ('Predicting all games for year: %d, week %d' % (year, week))
-        error, accuacy = predict_week(year, week, options.go_back, True)
+        error, accuacy = predict_week(year, week, options.go_back, model,True)
         print ('Results: error %.2f, accuracy %.3f' % (error, accuacy))
     
     if options.simulation:    
@@ -123,7 +120,6 @@ def main():
         dates_total = np.array([0.0] * (END_YEAR-START_YEAR + 1)*WEEKS_PER_SEASON)
         weeks_total = np.array([0.0] * 17)
         
-        model = team_tracker()
         
         for go_back in go_backs:
             week_range = (END_YEAR-START_YEAR + 1)*WEEKS_PER_SEASON - go_back
@@ -142,7 +138,7 @@ def main():
                 week = (raw_week + go_back) % WEEKS_PER_SEASON + 1
                 
                 #print ('Year: %d, Week: %d' % (year, week))
-                error, percentage = predict_week(year, week, go_back, False, model)
+                error, percentage = predict_week(year, week, go_back, model, False)
                 #error, percentage = predict_week(year, week, go_back)
                 print ('Error: %.2f, Percentage: %.2f' % (error, percentage))
                 accuracy += percentage
@@ -164,6 +160,7 @@ def main():
         plt.plot(week_accuracy)   
         print (str(weeks_acc/weeks_total))
         print ('total accuracy: %s' %str(acs))
+        
         plt.figure(2)
         plt.title('Accuracy by go back')
         plt.plot(go_backs, acs)
