@@ -4,17 +4,17 @@ import random
 import matplotlib.pyplot as plt
 from modeler2 import home_model as team_tracker 
 from modeler import get_team
-#from ai_model import ai_model as team_tracker
+#from prediction_model_ai import prediction_model_ai as team_tracker
 import threading
 import cProfile
 from multiprocessing import Process
-from ai_model import ai_model
+#from prediction_model_ai import prediction_model_ai
 
-#ai_model(10)
+#prediction_model_ai(10)
 
 from multiprocessing.dummy import Pool 
 
-DEBUG = False
+DEBUG = True
 np.random.seed(2)
 
 SIMS = 100
@@ -104,8 +104,8 @@ def main():
     #team_stats.process_history(2016, 2016, 1, 17)
     #print (str(team_stats.play_match('SEA','GB', None, None, 10000)))
     
-    #print(predict_week(2017, 1, 30, True))
-    #return 0
+    print(predict_week(2017, 2, 19, True))
+    return 0
     
     
 

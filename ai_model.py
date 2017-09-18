@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 import nflgame
-from modeler2 import get_team
+from statistical_model import get_team
 from calendar import week
 
 from sklearn.neural_network import MLPClassifier
@@ -88,7 +88,7 @@ class stat_tracker():
 
 
     
-class ai_model():
+class prediction_model_ai():
     data_storage = None
     save_games = None
     
@@ -148,15 +148,15 @@ class ai_model():
             
             team = get_team(teams[homen])
             
-            ai_model.data_storage.add_stat(team, stats[homen] + stats[otheri][:-1], homet, date, other_team )  # pull off wins      
+            prediction_model_ai.data_storage.add_stat(team, stats[homen] + stats[otheri][:-1], homet, date, other_team )  # pull off wins      
     
     def __get_vector__(self, home, away, date, go_back):
-        home_stats = ai_model.data_storage.get_stats_mean(home, date, go_back)
-        away_stats = ai_model.data_storage.get_stats_mean(away, date, go_back)
+        home_stats = prediction_model_ai.data_storage.get_stats_mean(home, date, go_back)
+        away_stats = prediction_model_ai.data_storage.get_stats_mean(away, date, go_back)
         
         #home_def_stats
-        #home_defense = ai_model.data_storage.get_defense_means(home, date, go_back, means)
-        #away_defense = ai_model.data_storage.get_defense_means(away, date, go_back, means)
+        #home_defense = prediction_model_ai.data_storage.get_defense_means(home, date, go_back, means)
+        #away_defense = prediction_model_ai.data_storage.get_defense_means(away, date, go_back, means)
         
         return pd.concat([home_stats, away_stats], join='inner').to_frame().T
 
@@ -169,12 +169,12 @@ class ai_model():
             self.X = pd.DataFrame([])
             dates = []
             
-            for i in range(go_back, len(ai_model.save_games)):
-                year, week, games = ai_model.save_games[i]
+            for i in range(go_back, len(prediction_model_ai.save_games)):
+                year, week, games = prediction_model_ai.save_games[i]
                 if DEBUG:
                     print ('Creating records: %d, %d' % (year, week))
                 date = year * 100 + week
-                #means = ai_model.data_storage.get_means(date, go_back)
+                #means = prediction_model_ai.data_storage.get_means(date, go_back)
                 for home, away, score_home, score_away in games:
                     dates.append(date)
                     home_win = int(score_home > score_away)   # 1 for home win 0 otherwise
@@ -194,17 +194,17 @@ class ai_model():
     def pull_data(self):
         
         # pull all stats from 2009 week 1 to now 2017 week 1
-        if ai_model.data_storage == None:
+        if prediction_model_ai.data_storage == None:
             year, week = 0, 0
             if os.path.exists(SAVE_FILE):
                 print ('Loading previous data...')
                 with open(SAVE_FILE) as ri:
-                    year, week, ai_model.data_storage, ai_model.save_games = pickle.load(ri)
+                    year, week, prediction_model_ai.data_storage, prediction_model_ai.save_games = pickle.load(ri)
             
             if year != LAST_YEAR or week != LAST_WEEK:
                 print ('Loading new game data...')
-                ai_model.data_storage = stat_tracker(self.__get_final_stats__())
-                ai_model.save_games = []
+                prediction_model_ai.data_storage = stat_tracker(self.__get_final_stats__())
+                prediction_model_ai.save_games = []
                 last_week = 17
                 for year in range(FIRST_YEAR, LAST_YEAR + 1):
                     if year == LAST_YEAR: last_week = LAST_WEEK
@@ -215,10 +215,10 @@ class ai_model():
                         for game in games:
                             self.add_game_static(game, year, week)
                             new_games.append((get_team(game.home), get_team(game.away), game.score_home, game.score_away))
-                        ai_model.save_games.append((year, week, new_games))
+                        prediction_model_ai.save_games.append((year, week, new_games))
                 print ('Pickling...')
                 with open(SAVE_FILE, 'w') as wo:
-                    pickle.dump((LAST_YEAR, LAST_WEEK, ai_model.data_storage, ai_model.save_games), wo)
+                    pickle.dump((LAST_YEAR, LAST_WEEK, prediction_model_ai.data_storage, prediction_model_ai.save_games), wo)
                 print ('Saved data.')
            
             
@@ -256,7 +256,7 @@ class ai_model():
         self.model = MLPClassifier(alpha=1)
         
         self.model.fit(X, Y)
-        #print str(zip(ai_model.data_storage.columns + ai_model.data_storage.columns, self.model.feature_importances_))
+        #print str(zip(prediction_model_ai.data_storage.columns + prediction_model_ai.data_storage.columns, self.model.feature_importances_))
         pass
         
     def play_match(self, home, away, time, weather, sims):
