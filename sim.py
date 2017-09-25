@@ -14,7 +14,7 @@ from multiprocessing.dummy import Pool
 models = {'stat' : stat_model, 'ai' : ai_model}
 
 np.random.seed(2)
-SIMS = 1000
+SIMS = 100000
 games_cache = {}
 
 
@@ -113,7 +113,7 @@ def main():
     
     if options.simulation:    
         go_backs = range(4, 20, 2)
-        acs = []
+        acs     = []
         weeks_acc = np.array([0.0] * 17)
         dates_acc = np.array([0.0] * (END_YEAR-START_YEAR + 1)*WEEKS_PER_SEASON)
         

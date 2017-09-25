@@ -16,7 +16,7 @@ from pandas.core.frame import DataFrame
 
 FIRST_YEAR = 2009
 LAST_YEAR = 2017
-LAST_WEEK = 1
+LAST_WEEK = 2
 SAVE_FILE = 'formatted_data'
 
 DEBUG=True
@@ -26,7 +26,10 @@ class stat_tracker():
         # One set per team for this stat.  If a new vector is added, append to the old stat
         self.columns = columns
         self.stat = pd.DataFrame(columns=columns + ['team', 'home', 'opponent', 'date'])
+        #self.stat['team'] = self.stat['team'].astype('category')
+        #self.stat['opponent'] = self.stat['opponent'].astype('category')
         self.teams = set([])
+        self.team_map = None
     
     '''
     def get_teams(self):
@@ -46,13 +49,16 @@ class stat_tracker():
     def get_stats_mean(self, team, date, go_back):
         team_test = self.stat['team'] == team
         date_test = self.stat['date'] <= date
+        if self.team_map == None:
+            self.team_map = {tm: i for i, tm in enumerate(self.teams)}
+        teamn = self.team_map[team]
         records = self.stat[team_test & date_test][self.columns][-1*go_back:]
         weights = np.array([[1.0] * len (self.columns)] * records.shape[0])
         week = date % 100
         if week < go_back:
             weights[0:go_back-week] = weights[0:go_back-week] * .5
         #print ('Date: %d, weights: %s' % (date, str(weights)))
-        return (records * weights).sum() / weights.sum(axis=0)
+        return ((records * weights).sum() / weights.sum(axis=0)).append(pd.Series({'teamn':teamn}))
     
     def get_means(self, date, go_back):
         '''
@@ -247,13 +253,7 @@ class prediction_model_ai():
         Y = self.Y[self.Y['date'] <= end_date].ix[:, self.Y.columns != 'date'].values.T[0]
         
         self.cur_date = end_date
-        
-        # train model
-        #self.model = RandomForestClassifier(max_depth=2, random_state=0)
-        #self.model = AdaBoostClassifier()
-        #self.model = GaussianNB()
-        #self.model = KNeighborsClassifier(3)
-        self.model = MLPClassifier(alpha=1)
+        self.model = RandomForestClassifier(max_depth=2)
         
         self.model.fit(X, Y)
         #print str(zip(prediction_model_ai.data_storage.columns + prediction_model_ai.data_storage.columns, self.model.feature_importances_))
@@ -265,4 +265,6 @@ class prediction_model_ai():
         
         return (0, 0, probs[0][1], probs[0][0])
         
-        
+
+class prediction_regression_model_ai(prediction_model_ai):
+    pass
