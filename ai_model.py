@@ -3,6 +3,9 @@ import numpy as np
 import nflgame
 from statistical_model import get_team
 from calendar import week
+from statistical_model import home_model as hm
+
+
 
 from sklearn.neural_network import MLPClassifier
 from sklearn.ensemble import RandomForestClassifier, AdaBoostClassifier
@@ -16,7 +19,7 @@ from pandas.core.frame import DataFrame
 
 FIRST_YEAR = 2009
 LAST_YEAR = 2017
-LAST_WEEK = 2
+LAST_WEEK = 17
 SAVE_FILE = 'formatted_data'
 
 DEBUG=True
@@ -137,7 +140,7 @@ class prediction_model_ai():
                     if attribute in player.__dict__:
                         game_list[i] += player.__dict__[attribute]
             
-            game_list += [scores[homen], scores[homen], int(game.winner == teams[homen])]
+            game_list += [scores[homen], scores[homen], int(get_team(game.winner) == teams[homen])]
             
             
             # compute yards per att and pts per yard
@@ -267,4 +270,49 @@ class prediction_model_ai():
         
 
 class prediction_regression_model_ai(prediction_model_ai):
-    pass
+    def __init__(self):
+        self.__init__()
+        self.hm = hm()
+
+    def __get_final_stats__(self):
+        return ['win']
+        #return ['yards_per_rush', 'yards_per_pass', 'points_per_yard', 'points_per_game', 'win',
+        #        'yards_per_rush_def', 'yards_per_pass_def', 'points_per_yard_def', 'points_per_game_def']
+        
+    def __get_player_raw__(self):
+        return []
+    
+    def __get_team_raw__(self):
+        return ['points']
+    
+    def __transform_stats__(self, game_list):
+        #game_list = game_list[2:]
+        return game_list
+    
+    def add_game_static(self, game, year, week):
+        accum_stats = self.__get_player_raw__()
+        date = year * 100 + week
+        # keep track of attemps, yards, pts
+        # [home[attempts, yards, pts], away[attempts, yards, pts]]
+        teams = [get_team(game.away), get_team(game.home)]
+        scores = [ game.score_away ,game.score_home]
+        global_stats = [ game.stats_away, game.stats_home]
+        stats = [0, 0]
+
+        for homet in [True, False]:
+            homen = int(homet)
+            team = teams[homen]
+
+            otheri =  (homen + 1) % 2
+            other_team = get_team(teams[otheri])        
+                        
+            # keep track of rush attemps, pass attempts, rush yards, pass yards, pts
+            game_list = [int(get_team(game.winner) == teams[homen])]
+            prediction_model_ai.data_storage.add_stat(team, game_list, homet, date, other_team )
+    
+    def __get_vector__(self, home, away, date, go_back):
+        vect = prediction_model_ai.__get_vector__(self, home, away, date, go_back)
+            
+        return vect
+    
+
