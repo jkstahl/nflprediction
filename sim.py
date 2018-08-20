@@ -17,6 +17,7 @@ np.random.seed(2)
 SIMS = 100000
 games_cache = {}
 
+DEBUG = False
 
 def eval_prediction(game, prediction_home, prediction_away, winner, print_it=False):
     actual_winner = get_team(game.winner)
@@ -40,7 +41,8 @@ def eval_games(games, predictions, print_it=False):
 
 
 def predict_week(season, week, go_back, team_stats, print_it = False):
-    print ('season: %d, week: %d' % (season, week))
+    if print_it:
+        print ('season: %d, week: %d' % (season, week))
     
     # get history up to and including week - go_back
     week_delta = (week - go_back)
@@ -112,7 +114,7 @@ def main():
         print ('Results: error %.2f, accuracy %.3f' % (error, accuacy))
     
     if options.simulation:    
-        go_backs = range(4, 20, 2)
+        go_backs = range(6, 18, 2)
         acs     = []
         weeks_acc = np.array([0.0] * 17)
         dates_acc = np.array([0.0] * (END_YEAR-START_YEAR + 1)*WEEKS_PER_SEASON)
@@ -122,9 +124,11 @@ def main():
         
         
         for go_back in go_backs:
+            print 'Trying go_back %d' % go_back
             week_range = (END_YEAR-START_YEAR + 1)*WEEKS_PER_SEASON - go_back
             num_tests = TESTS if RANDOM else week_range 
-            print ('Number of weeks of sim %d' % week_range)
+            if DEBUG:
+                print ('Number of weeks of sim %d' % week_range)
             accuracy = 0
             j = 1
             
@@ -140,7 +144,8 @@ def main():
                 #print ('Year: %d, Week: %d' % (year, week))
                 error, percentage = predict_week(year, week, go_back, model, False)
                 #error, percentage = predict_week(year, week, go_back)
-                print ('Error: %.2f, Percentage: %.2f' % (error, percentage))
+                if DEBUG:
+                    print ('Error: %.2f, Percentage: %.2f' % (error, percentage))
                 accuracy += percentage
                 weeks_acc[week-1] += percentage
                 weeks_total[week-1] += 1

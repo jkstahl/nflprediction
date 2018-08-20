@@ -5,8 +5,7 @@ from statistical_model import get_team
 from calendar import week
 from statistical_model import home_model as hm
 
-
-
+from sklearn import decomposition
 from sklearn.neural_network import MLPClassifier
 from sklearn.ensemble import RandomForestClassifier, AdaBoostClassifier
 from sklearn.neighbors import KNeighborsClassifier
@@ -22,7 +21,7 @@ LAST_YEAR = 2017
 LAST_WEEK = 17
 SAVE_FILE = 'formatted_data'
 
-DEBUG=True
+DEBUG=False
 
 class stat_tracker():
     def __init__(self, columns):
@@ -255,15 +254,21 @@ class prediction_model_ai():
         X = self.X[self.X['date'] <= end_date].ix[:, self.X.columns != 'date'].values
         Y = self.Y[self.Y['date'] <= end_date].ix[:, self.Y.columns != 'date'].values.T[0]
         
+        # do PCA and select best features
+        #self.pca = decomposition.PCA(n_components=15)
+        #self.pca.fit(X)
+        #X = self.pca.transform(X)        
+        
         self.cur_date = end_date
         self.model = RandomForestClassifier(max_depth=2)
-        
+                
         self.model.fit(X, Y)
         #print str(zip(prediction_model_ai.data_storage.columns + prediction_model_ai.data_storage.columns, self.model.feature_importances_))
         pass
         
     def play_match(self, home, away, time, weather, sims):
         vect = self.__get_vector__(home, away, self.cur_date, self.go_back)
+        #vect = self.pca.transform(vect)
         probs = self.model.predict_proba(vect)
         
         return (0, 0, probs[0][1], probs[0][0])
