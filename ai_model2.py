@@ -10,7 +10,9 @@ from sklearn.ensemble import RandomForestClassifier
 
 START_YEAR = 2009
 MAX_WEEKS = 17
-MIN_WEEK = 200906  # sixth week of 2009
+MIN_YEAR = 2009
+MIN_W = 06
+MIN_WEEK = MIN_YEAR * 100 + MIN_W  # sixth week of 2009
 
 
 class new_model():
@@ -30,7 +32,7 @@ class new_model():
         stats_map['home'] = []
         stats_map['date'] = []
         stats_map['week'] = []
-        self.stats =  list(set(nflgame.games(2009, 1)[0].stats_home._fields) - remove)
+        self.stats =  list(set(nflgame.games(MIN_YEAR, 1)[0].stats_home._fields) - remove)
         print self.stats
         for stat in self.stats:
             stats_map[stat] = []
@@ -78,7 +80,7 @@ class new_model():
         
         # get home and away
         home_teams = recs[recs['home'] == 1]
-        away_teams = recs[recs['away'] == 0]
+        away_teams = recs[recs['home'] == 0]
         
         # combine home and away
         self.game_recs = pd.merge(home_teams[['id','week'] + self.stats], away_teams[['id'] + self.stats], on='id').drop(['id'], axis=1)
@@ -103,9 +105,31 @@ class new_model():
         
         return self.model.predict(home.append(away).to_frame().values.T)
     
+    def predict_week(self, year, week):
+        yw = year * 100 + week
+        game_set = self.game_recs[self.game_recs['week'] == yw].drop('week', axis=1)
+        return self.model.predict(game_set.values)
+    
+    def actual_week(self, year, week):
+        yw = year * 100 + week
+        game_set = self.outputs[self.outputs['week'] == yw].drop('week', axis=1)
+        return game_set.values
+    
+    def back_test(self):
+        for year in range(MIN_YEAR, self.last_year + 1):
+            for week in range(1, MAX_WEEKS + 1):
+                if year == MIN_YEAR and week < MIN_W or week == MAX_WEEKS and year == self.last_year:
+                    continue
+                self.train(year, week)
+                next_year, next_week = (year, week + 1) if week < MAX_WEEKS else (year + 1, week)
+                predict = self.predict_week(next_year, next_week)
+                actual = self.actual_week(next_year, next_week)
+                print 1.0 * np.sum(predict == actual.T) / len(predict)
+    
 if __name__ ==  '__main__':
     m = new_model()
     m.load_stats()
     m.process_records()
     m.train(2017, 16)
     print m.predict('SEA', 'SF')
+    m.back_test()
