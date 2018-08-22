@@ -6,6 +6,7 @@ from statistical_model import get_team
 from calendar import week
 from statistical_model import home_model as hm
 
+from sklearn.ensemble import RandomForestClassifier
 
 START_YEAR = 2009
 MAX_WEEKS = 17
@@ -69,13 +70,15 @@ class new_model():
         teams = set(self.stat_data['team'].unique())   
         for team in teams:
             team_time_series = recs[recs['team'] == team][self.stats]
-            team_time_series = team_time_series.ewm(alpha=.5).mean()
+            team_time_series = team_time_series.ewm(alpha=alpha).mean().shift(1)
             recs.update(team_time_series)
             pass
         
+        self.recs = recs
+        
         # get home and away
         home_teams = recs[recs['home'] == 1]
-        away_teams = recs[recs['home'] == 0]
+        away_teams = recs[recs['away'] == 0]
         
         # combine home and away
         self.game_recs = pd.merge(home_teams[['id','week'] + self.stats], away_teams[['id'] + self.stats], on='id').drop(['id'], axis=1)
@@ -86,14 +89,23 @@ class new_model():
         Train up until year, week
         '''
         yw = year * 100 + week
-        valid_recs = self.game_recs[(self.game_recs['week'] < yw) & (self.game_recs['week'] >= MIN_WEEK)].drop('week', axis=1)
-        outputs = self.outputs[(self.outputs['week'] <= yw) & (self.outputs['week'] > MIN_WEEK)].drop('week', axis=1)
+        valid_recs = self.game_recs[(self.game_recs['week'] <= yw) & (self.game_recs['week'] >= MIN_WEEK)].drop('week', axis=1)
+        outputs = self.outputs[(self.outputs['week'] <= yw) & (self.outputs['week'] >= MIN_WEEK)].drop('week', axis=1)
         assert len(valid_recs) == len(outputs)
+        
+        self.model = RandomForestClassifier(max_depth=2)
+        self.model.fit(valid_recs.values, outputs.values)
         pass
+    
+    def predict(self, home_team, away_team):
+        home = self.recs[self.recs['team'] == home_team].iloc[-1][self.stats]
+        away = self.recs[self.recs['team'] == away_team].iloc[-1][self.stats]
+        
+        return self.model.predict(home.append(away).to_frame().values.T)
     
 if __name__ ==  '__main__':
     m = new_model()
     m.load_stats()
     m.process_records()
-    m.train(2017, 5)
-    pass
+    m.train(2017, 16)
+    print m.predict('SEA', 'SF')
