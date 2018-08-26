@@ -38,23 +38,26 @@ class new_model():
         remove = set(['pos_time'])
         self.outputs = {'week': [], 'output': []}
         
+        reg_attribs = ['win', 'team', 'id', 'home', 'date', 'week', 'score']
         extra_attribs = ['rushing_att', 'passing_att']
+        
         for att in extra_attribs:
             stats_map[att] = []
+            # defense
+            stats_map['d' + att] = []
         
-        stats_map['win'] = []
-        stats_map['team'] = []
-        stats_map['id'] = []     # to identify a single game
-        stats_map['home'] = []
-        stats_map['date'] = []
-        stats_map['week'] = []
-        stats_map['score'] = []
+        for att in reg_attribs:
+            stats_map[att] = []
         
         self.stats =  list(set(nflgame.games(MIN_YEAR, 1)[0].stats_home._fields) - remove)
-        print self.stats
+        self.print_out( self.stats)
+        d_stats = []
         for stat in self.stats:
             stats_map[stat] = []
-            
+            stats_map['d' + stat] = []
+            d_stats.append('d' + stat)
+        
+        
         game_num = 0
         self.last_year, self.last_week = nflgame.live.current_year_and_week() 
         for year in range(START_YEAR, self.last_year+1):
@@ -79,15 +82,27 @@ class new_model():
                     stats_map['score'].append(game.score_away)
                     
                     for stat in self.stats:
-                        # home
+                        # offense
                         stats_map[stat].append(float(game.stats_home.__getattribute__(stat)))
                         stats_map[stat].append(float(game.stats_away.__getattribute__(stat)))
+                        
+                        # swap order of home away for defense
+                        stats_map['d' + stat].append(float(game.stats_away.__getattribute__(stat)))
+                        stats_map['d' + stat].append(float(game.stats_home.__getattribute__(stat)))
+                        
                     
                     # for home and away get extra stats
                     for h in [True, False]:
                         new_stats = self.__get_weird_stats__(game, extra_attribs, h)
                         for stat, value in zip(extra_attribs, new_stats ):
-                            stats_map[stat].append(value) 
+                            stats_map[stat].append(value)
+                            
+                            # swap for defense
+                            if not h:
+                                stats_map['d' + stat].insert(-1, value)
+                            else:
+                                 stats_map['d' + stat].append(value)
+                                 
                     game_num +=1
                     
         self.stats.append('win')
@@ -96,14 +111,15 @@ class new_model():
         self.outputs = pd.DataFrame(self.outputs)
         
         # transform 
-        self.stat_data['rush_per_att'] = self.stat_data['rushing_yds'] / self.stat_data['rushing_att']
-        self.stat_data['pass_per_att'] = self.stat_data['passing_yds'] / self.stat_data['passing_att']
+        for d in ['', 'd']:
+            self.stat_data[d + 'rush_per_att'] = self.stat_data[d + 'rushing_yds'] / self.stat_data[d + 'rushing_att']
+            self.stat_data[d + 'pass_per_att'] = self.stat_data[d + 'passing_yds'] / self.stat_data[d + 'passing_att']
         
         # drop colls
-        self.stats += ['rush_per_att', 'pass_per_att']
-        drop_list = ['rushing_yds', 'rushing_att', 'passing_yds', 'passing_att']
+        self.stats += (['rush_per_att', 'pass_per_att'] + ['drush_per_att', 'dpass_per_att'] + d_stats)
+        drop_list = ['rushing_att', 'passing_yds', 'passing_att']
         self.stats = list(set(self.stats) - set(drop_list))
-
+        
         self.old_stats = self.stats
     
     def process_records(self, alpha= .5):
