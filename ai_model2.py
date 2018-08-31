@@ -19,6 +19,8 @@ MIN_W = 06
 MIN_WEEK = MIN_YEAR * 100 + MIN_W  # sixth week of 2009
 SAVE_FILENAME = 'savestats.dat'
 
+
+
 class new_model():
     def __init__(self):
         self.raw_stats = None
@@ -149,16 +151,36 @@ class new_model():
                 usable.append(col)
         return usable
     
-    def process_records(self, alpha= .5):
+    def __windowed_average__(self, x):
+        window = self.pre_compute[len(self.pre_compute)-len(x):] * self.discount_weights[:len(x)]
+        return np.sum(window * x) / window.sum()
+        
+
+    
+    def process_records(self, alpha= .5, season_discount = .75):
+        '''
+        This filters all of the stats creating records for each game week with all of the average stats.  The stats
+        are filtered over all of the data so that older games are discounted on exponential decay.  The season are also 
+        discounted so that the previous season are not considered as much as the current season.
+        
+        alpha - this is the filter constant that represents how much to discount the stats from each previous game.
+        season_discount - each season, discount by this coefficient.
+        '''
+        
         #yw = year * 100 + week
         self.stats = self.old_stats[:]
         self.print_out('Processing records..')
         
+        self.alpha = alpha
+        
         recs = self.stat_data.copy(True)
         teams = set(self.stat_data['team'].unique())   
+        self.pre_compute = np.fliplr([np.exp(np.array(range(len(self.stat_data))) * np.log(1-alpha))])[0]
+        self.discount_weights = np.exp(np.array(range(len(self.stat_data))) / 17 * np.log(season_discount))
         for team in teams:
             team_time_series = recs[recs['team'] == team][self.stats]
-            team_time_series = team_time_series.ewm(alpha=alpha).mean().shift(1)
+            team_time_series = team_time_series.expanding().apply(self.__windowed_average__, raw=True).shift(1)
+            #t2 = team_time_series.ewm(alpha=alpha).mean().shift(1)
             recs.update(team_time_series)
             pass
         
