@@ -1,16 +1,18 @@
+
 import pandas as pd
 import numpy as np
 import nflgame
 import math, pickle, os
 from statistical_model import get_team
 from calendar import week
-from statistical_model import home_model as hm
+import multiprocessing as mp
 
 from sklearn.decomposition import PCA
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.naive_bayes import GaussianNB
 from sklearn.ensemble.weight_boosting import AdaBoostClassifier
+
 
 START_YEAR = 2009
 MAX_WEEKS = 17
@@ -22,12 +24,16 @@ SAVE_FILENAME = 'savestats.dat'
 
 
 class new_model():
+    stat_data = None
+    stats = None
+    outputs = None
+    
     def __init__(self):
         self.raw_stats = None
         self.print_it = True
     
     def __get_weird_stats__(self, game, attrib_list, home):
-            game_list = [0] * len(attrib_list)
+            game_list = [0.0] * len(attrib_list)
             for player in game.players.filter(home=home):
                 for i, attribute in enumerate(attrib_list):
                     if attribute in player.__dict__:
@@ -39,6 +45,8 @@ class new_model():
             print (output)
     
     def load_stats(self):
+        
+        
         self.last_year, self.last_week = nflgame.live.current_year_and_week() 
         if os.path.exists(SAVE_FILENAME):
             self.print_out('Loading old stat data..')
@@ -52,7 +60,7 @@ class new_model():
             self.outputs = {'week': [], 'output': []}
             
             reg_attribs = ['win', 'team', 'id', 'home', 'date', 'week', 'score']
-            extra_attribs = ['rushing_att', 'passing_att']
+            extra_attribs = ['rushing_att', 'passing_att'] #, 'defense_sk'
             
             for att in extra_attribs:
                 stats_map[att] = []
@@ -74,7 +82,9 @@ class new_model():
             game_num = 0
             
             for year in range(START_YEAR, self.last_year+1):
-                for week in range(1, self.last_week + 1):
+                for week in range(1, MAX_WEEKS + 1):
+                    if year == self.last_year and week > self.last_week:
+                        continue
                     self.print_out ('Year %d, week %d' % (year, week))
                     games = nflgame.games(year, week)
                     for game in games:
@@ -130,7 +140,7 @@ class new_model():
             
             # drop colls
             self.stats += (['rush_per_att', 'pass_per_att'] + ['drush_per_att', 'dpass_per_att'] + d_stats)
-            drop_list = ['rushing_att', 'passing_yds', 'passing_att']
+            drop_list = ['rushing_att', 'passing_yds', 'passing_att'] 
             self.stats = list(set(self.stats) - set(drop_list))
             
             
@@ -146,7 +156,7 @@ class new_model():
         self.print_out (win_correlation)
         
         for col, val in win_correlation.iteritems():
-            if abs(val) >= .2:
+            if abs(val) >= corr_val:
                 self.print_out('Removing %s' % col)
                 usable.append(col)
         return usable
@@ -174,21 +184,27 @@ class new_model():
         self.alpha = alpha
         
         recs = self.stat_data.copy(True)
-        teams = set(self.stat_data['team'].unique())   
+        teams = set(self.stat_data['team'].unique())
+        
+        # compute the filter weights so we don't have to do it for each team.   
         self.pre_compute = np.fliplr([np.exp(np.array(range(len(self.stat_data))) * np.log(1-alpha))])[0]
         self.discount_weights = np.exp(np.array(range(len(self.stat_data))) / 17 * np.log(season_discount))
+        
+        # keep track of the latest records to make future predictions
+        self.latest = {}
         for team in teams:
             team_time_series = recs[recs['team'] == team][self.stats]
-            team_time_series = team_time_series.expanding().apply(self.__windowed_average__, raw=True).shift(1)
+            team_time_series = team_time_series.expanding().apply(self.__windowed_average__, raw=True)
+            self.latest[team] = team_time_series.iloc[-1] 
+            team_time_series = team_time_series.shift(1)
             #t2 = team_time_series.ewm(alpha=alpha).mean().shift(1)
             recs.update(team_time_series)
-            pass
         
         self.print_out('Correlations:')
-        self.stats = self.__remove_uncorrelated__(recs, .2)
+        self.stats = list(set(self.__remove_uncorrelated__(recs, .2)) & set(self.stats))
 
         self.print_out('Using columns: %s' % str(self.stats))
-        self.print_out(recs[['win', 'team']][-32:])
+        #self.print_out(recs[['win', 'team']][-32:])
         '''
         # Do pca and reselect
         self.pca = PCA()
@@ -207,7 +223,7 @@ class new_model():
         
         # combine home and away
         self.game_recs = pd.merge(home_teams[self.stats + ['week', 'id']], away_teams[self.stats + ['id']], on='id').drop(['id'], axis=1)
-        pass
+
         
     
     def train(self, year, week):
@@ -221,15 +237,17 @@ class new_model():
         
         #self.model = RandomForestClassifier(max_depth=5)
         self.model = GaussianNB() 
-        self.model.fit(valid_recs.values, outputs.values)
+        self.model.fit(valid_recs.values, outputs.values.T[0])
         
+    def get_s_vect(self, team):
+        return self.latest[team][self.stats]
     
     def predict(self, home_team, away_team):
-        home = self.recs[self.recs['team'] == home_team].iloc[-1][self.stats]
-        away = self.recs[self.recs['team'] == away_team].iloc[-1][self.stats]
-        self.home_pca.transform(home.values)
-        self.away_pca.transform(away.values)
-        return self.model.predict(home.append(away).to_frame().values.T)
+        home = self.latest[home_team][self.stats]
+        away = self.latest[away_team][self.stats]
+        new_frame = home.append(away).to_frame().values.T
+        prob = self.model.predict_proba(new_frame) 
+        return (prob[0][0], prob[0][1], self.model.predict(new_frame)[0])
     
     def predict_week(self, year, week):
         yw = year * 100 + week
@@ -245,8 +263,9 @@ class new_model():
         psum = 0
         i = 0
         self.print_out('Running backtest...')
+        last_full_year = self.last_year if self.last_week == MAX_WEEKS else self.last_year - 1
         
-        for year in range(MIN_YEAR + 2, self.last_year + 1):
+        for year in range(MIN_YEAR + 2, last_full_year + 1):
             year_acc = 0
             for week in range(1, MAX_WEEKS + 1):
                 i += 1
@@ -255,7 +274,7 @@ class new_model():
                 rerun_sum = 0
                 for run in range(reruns):
                     self.train(year, week)
-                    next_year, next_week = (year, week + 1) if week < MAX_WEEKS else (year + 1, week)
+                    next_year, next_week = (year, week + 1) if week < MAX_WEEKS else (year + 1, 1)
                     predict = self.predict_week(next_year, next_week)
                     actual = self.actual_week(next_year, next_week)
                     acuracy =1.0 * np.sum(predict == actual.T) / len(predict)
@@ -272,26 +291,67 @@ class new_model():
     def find_best_alpha(self):
         max_acc =0 
         max_alpha = 0
-        for alpha in np.linspace(.1, .9, 100):
-            self.print_it = False
-            self.process_records(alpha)
-            acc = self.back_test()
-            self.print_it = True
-            self.print_out('Alpha %f, accuracy: %f' % (alpha, acc))
-            if acc > max_acc:
-                max_acc = acc
-                max_alpha = alpha
-        return max_alpha
+        max_s = 0
     
+        for alpha in np.linspace(.1, .9, 100):
+            for season_discount in np.linspace(.1, .9, 100):
+                self.print_it = False
+                self.process_records(alpha, season_discount)
+                acc = self.back_test()
+                self.print_it = True
+                self.print_out('Alpha %f, max_s %f,accuracy: %f' % (alpha, season_discount, acc))
+                if acc > max_acc:
+                    self.print_out('FOUND BEST!')
+                    max_s = season_discount
+                    max_acc = acc
+                    max_alpha = alpha
+        return (max_alpha, max_s)
+    
+
+
+def proc_wrapper(o, a,s):
+    #print 'Starting wrapper...'
+    o.process_records(a, s)
+    result = o.back_test()
+    #print 'Done.'
+    return result
+
+
 if __name__ ==  '__main__':
     m = new_model()
     m.load_stats()
     #m.process_records(0.027980)
-    m.process_records(0.172)
+    m.process_records(0.172727, 0.663518)
     #m.train(2017, 17)
     #print m.predict('SEA', 'SF')
     
     m.back_test()
+    import sys
+    sys.exit(0)
+    #print m.find_best_alpha()
+    max_acc =0 
+    max_alpha = 0
+    max_s = 0
+    season_discount = np.linspace(.1, .99, 100)
+    models = [new_model() for sd in season_discount ]
+    for o in models:
+        o.load_stats()
+        o.print_it=False
+    pool = mp.Pool()
+    for alpha in np.linspace(.1, .9, 100):
+        print 'alpha %f' % alpha
+        
+        results = [pool.apply_async(proc_wrapper, args=(o, alpha, sd,)) for sd, o in zip(season_discount, models)]
+        output = [p.get() for p in results]
+        output = zip(output, season_discount)
+        output = sorted(output, reverse=True) 
+        if output[0][0] > max_acc:
+            max_acc = output[0][0]
+            max_s = output[0][1]
+            max_alpha = alpha
+            print 'Found new max: alpha %f, season_discount %f, accuracy %f' % (max_alpha, max_s, max_acc)
+        
+        print 'Best found: alpha %f, season_discount %f, val %f' % (max_alpha, max_s, max_acc)
     #malpha = m.find_best_alpha()
     #print 'Best alpha: %f' % malpha
     #print m.back_test()
