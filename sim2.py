@@ -19,7 +19,7 @@ games_cache = {}
 DEBUG = False
 
 
-def get_games(year, week):
+def get_games2(year, week):
     return [('ATL', 'PHI'),
             ('BUF', 'BAL'),
             ('PIT', 'CLE'),
@@ -36,6 +36,24 @@ def get_games(year, week):
             ('CHI',  'GB'),   
             ('NYJ', 'DET'),
             ('LA',  'OAK'),]  
+    
+def get_games(year, week):
+    return [('GB', 'CHI'),
+            ('KC', 'JAX'),
+            ('ATL', 'MIN'),
+            ('TEN', 'CLE'),
+            ('BUF', 'NYJ'),
+            ('BAL', 'MIA'),
+            ('WAS', 'PHI'),
+            ('LA', 'CAR'),
+            ('IND', 'LAC'),
+            ('CIN', 'SEA'),
+            ('NYG', 'DAL'),
+            ('SF', 'TB'),
+            ('DET', 'ARI'),
+            ('PIT',  'NE'),   
+            ('HOU', 'NO'),
+            ('DEN',  'OAK'),]
 
 
 def eval_prediction(game, prediction_home, prediction_away, winner, print_it=False):
@@ -68,7 +86,9 @@ def predict_week(year, week, alpha, season_discount, model, print_it = False):
     model.process_records(alpha, season_discount)
     model.train(year, week)
     
-    for game in nflgame.live._games_in_week(year, week):
+    for game in get_games(0, 0):#nflgame.live._games_in_week(year, week):
+        away = game[0]
+        home = game[1]
         home = get_team(game['home'])
         away = get_team(game['away'])
         away_prob, home_prob, predict = model.predict(home, away)
