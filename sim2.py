@@ -42,7 +42,7 @@ def eval_prediction(game, prediction_home, prediction_away, winner, print_it=Fal
     actual_winner = get_team(game.winner)
     correct = actual_winner==winner
     if print_it:
-        print 'PREDICTED: %s ACTUAL %s - %s' % (winner, actual_winner,correct)
+        print ('PREDICTED: %s ACTUAL %s - %s' % (winner, actual_winner,correct))
     return (((game.score_home-prediction_home)**2)+((game.score_away-prediction_away)**2), correct)
 
 
@@ -60,7 +60,7 @@ def eval_games(games, predictions, print_it=False):
 
 
 def predict_week(year, week, alpha, season_discount, model, print_it = False):
-    print 'Getting predictions for: year %d, week %d' % (year, week)
+    print ('Getting predictions for: year %d, week %d' % (year, week))
         
     # simulate all games of a given week with the
     predictions = {} 
@@ -74,7 +74,7 @@ def predict_week(year, week, alpha, season_discount, model, print_it = False):
         away_prob, home_prob, predict = model.predict(home, away)
         predictions[home]=(home if predict == 1 else away)
         if print_it:
-            print '%s %f -%s %f    -> %s ' % (home, home_prob, away, away_prob, (away, home)[int(predict)])
+            print ('%s %f -%s %f    -> %s ' % (home, home_prob, away, away_prob, (away, home)[int(predict)]))
             #print '%s: %s' % (home, zip(model.stats, model.get_s_vect(home).values))
             #print '%s: %s' % (away, zip(model.stats, model.get_s_vect(away).values))
     
