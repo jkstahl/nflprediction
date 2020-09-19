@@ -7,7 +7,8 @@ game_cache = {}
 team_map = {
             'STL' : 'LA',
             'JAC' : 'JAX',
-            'SD'  : 'LAC'
+            'SD'  : 'LAC',
+            'STL' : 'PIT',
             }
 
 
