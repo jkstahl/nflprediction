@@ -23,7 +23,7 @@ def eval_prediction(game, prediction_home, prediction_away, winner, print_it=Fal
     actual_winner = get_team(game.winner)
     correct = actual_winner==winner
     if print_it:
-        print 'PREDICTED: %s ACTUAL %s - %s' % (winner, actual_winner,correct)
+        print ('PREDICTED: %s ACTUAL %s - %s' % (winner, actual_winner,correct))
     return (((game.score_home-prediction_home)**2)+((game.score_away-prediction_away)**2), correct)
 
 
@@ -67,7 +67,7 @@ def predict_week(season, week, go_back, team_stats, print_it = False):
         home_ave, away_ave, home_prob, away_prob = team_stats.play_match(home, away, None, None, SIMS)
         predictions[home]=(home_ave, away_ave, home if home_prob >= .5 else away)
         if print_it:
-            print '%s-%d, %s-%d, %s-%.1f%%, %s-%.1f%%' % (home, home_ave, away, away_ave, home, home_prob * 100, away, away_prob* 100)
+            print ('%s-%d, %s-%d, %s-%.1f%%, %s-%.1f%%' % (home, home_ave, away, away_ave, home, home_prob * 100, away, away_prob* 100))
     
     #print (str(team_stats.play_match('SEA', 'GB', None, None)))
     if (year, week) in games_cache:
@@ -124,7 +124,7 @@ def main():
         
         
         for go_back in go_backs:
-            print 'Trying go_back %d' % go_back
+            print ('Trying go_back %d' % go_back)
             week_range = (END_YEAR-START_YEAR + 1)*WEEKS_PER_SEASON - go_back
             num_tests = TESTS if RANDOM else week_range 
             if DEBUG:

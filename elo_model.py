@@ -1,24 +1,24 @@
 #import nflgame
+print ('elo_model')
 from game_scraper import game_scraper 
-nflgame = game_scraper()
 import pandas as pd
 from statistical_model import get_team
 from astropy.units import hd
 
-
 START_YEAR = 2009
 MAX_WEEK = 17
 STARTING_ELO = 1500
+MAX_ELO = 4000
+MIN_ELO = 100
 
 
 class elo_model():
     
-    def __init__(self, last_year_played, last_week_played):
+    def __init__(self, last_year_played, last_week_played, nflgame):
+        self.nflgame = nflgame
         # These are data frames where the collumns are teams and the rows are year/week
-        self.teams = list(set([get_team(team[0]) for team in nflgame.teams]))
-        
-        self.elo_offense = pd.DataFrame({i : [STARTING_ELO] for i in self.teams}, index=[START_YEAR * 100])
-        self.elo_defense = pd.DataFrame({i : [STARTING_ELO] for i in self.teams}, index=[START_YEAR * 100])
+        self.teams = list(set([get_team(team[0]) for team in self.nflgame.teams]))
+        self.reset()
         self.last_week_played = last_week_played
         self.last_year_played = last_year_played
         self.k_o = 4
@@ -26,9 +26,14 @@ class elo_model():
         self.div = 25
         self.points_offset = 24.2
         self.home_advantage = 25
-        print (self.teams)
-        print (len(self.teams))
     
+    def set_params(self, params):
+        assert (len(params) == 4)
+        self.k_o, self.k_d, self.div, self.home_advantage = params
+    
+    def reset(self):
+        self.elo_offense = pd.DataFrame({i : [STARTING_ELO] for i in self.teams}, index=[START_YEAR * 100])
+        self.elo_defense = pd.DataFrame({i : [STARTING_ELO] for i in self.teams}, index=[START_YEAR * 100])
     
     def match(self, offense_elo, defense_elo, home):
         '''
@@ -66,8 +71,9 @@ class elo_model():
     def update(self, yearweek, offense, defense, score, expected):
         oe = self.get_offense_elo(offense, yearweek - 1)
         de = self.get_defense_elo(defense, yearweek - 1)
-        self.update_team_offense_elo(offense, yearweek, oe + self.k_o * (score - expected))
-        self.update_team_defense_elo(defense, yearweek, de + self.k_d * (expected - score))
+        self.update_team_offense_elo(offense, yearweek, (oe + self.k_o * (score - expected)).clip(MIN_ELO, MAX_ELO))
+
+        self.update_team_defense_elo(defense, yearweek, (de + self.k_d * (expected - score)).clip(MIN_ELO, MAX_ELO))
     
     def __year_week_combine__(self, year, week):
         return year * 100 + week
@@ -84,22 +90,25 @@ class elo_model():
         return (self.match(ho, ad, True), self.match(ao, hd, False))
         
     def load_all_matches(self, verbose=False):
-        last_offense_elo = {}
-        last_defense_elo = {}
-        
+        self.reset()
         for year in range(START_YEAR, self.last_year_played + 1):
-            print ('Parsing year %d' % year)
+            if verbose:
+                print ('Parsing year %d' % year)
             for week in range(1, self.last_week_played + 1):
+                if verbose:
+                    print ('week %d' % week)
                 yearweek = self.__year_week_combine__(year, week)
-                for game in nflgame.games(year, week):
+                for game in self.nflgame.games(year, week):
+                    if verbose:
+                        print (game)
                     home, away = get_team(game.home), get_team(game.away)
-                    for t in [home, away]:
-                        if home not in last_offense_elo:
-                            last_offense_elo[t] = STARTING_ELO
-                            last_defense_elo[t] = STARTING_ELO
+
                     # update the elo based on the score of the home and away 
                     for t1, t2, score, homet in [(home, away, game.score_home, True), (away, home, game.score_away, False)]:
+                        if score == None:
+                            break
                         expected = self.match(self.get_offense_elo(t1, yearweek-1), self.get_defense_elo(t2, yearweek-1), homet)
+                        
                         self.update(yearweek, t1, t2, score, expected)
                         if verbose:
                             print ('home: %s away: %s score: %d expected %d' % (home, away, score, expected) )

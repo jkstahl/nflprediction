@@ -17,7 +17,7 @@ from sklearn.ensemble.weight_boosting import AdaBoostClassifier
 START_YEAR = 2009
 MAX_WEEKS = 17
 MIN_YEAR = 2009
-MIN_W = 06
+MIN_W = 6
 MIN_WEEK = MIN_YEAR * 100 + MIN_W  # sixth week of 2009
 SAVE_FILENAME = 'savestats.dat'
 
@@ -47,10 +47,10 @@ class new_model():
     def load_stats(self):
         
         
-        self.last_year, self.last_week = nflgame.live.current_year_and_week() 
+        self.last_year, self.last_week = nflgame.sched.current_year_and_week() 
         if os.path.exists(SAVE_FILENAME):
             self.print_out('Loading old stat data..')
-            self.stats, self.stat_data, self.outputs, last_year, last_week = pickle.load(open(SAVE_FILENAME))
+            self.stats, self.stat_data, self.outputs, last_year, last_week = pickle.load(open(SAVE_FILENAME, 'rb'))
         
         if not os.path.exists(SAVE_FILENAME) or last_year != self.last_year or last_week != self.last_week:
             self.print_out('Savefile not found.  Loading new stats.')
@@ -145,7 +145,7 @@ class new_model():
             
             
             self.print_out('Saving data...')
-            pickle.dump((self.stats, self.stat_data, self.outputs, self.last_year, self.last_week), open(SAVE_FILENAME, 'w'))
+            pickle.dump((self.stats, self.stat_data, self.outputs, self.last_year, self.last_week), open(SAVE_FILENAME, 'wb'))
             
         self.old_stats = self.stats
         
@@ -339,7 +339,7 @@ if __name__ ==  '__main__':
         o.print_it=False
     pool = mp.Pool()
     for alpha in np.linspace(.1, .9, 100):
-        print 'alpha %f' % alpha
+        print ('alpha %f' % alpha)
         
         results = [pool.apply_async(proc_wrapper, args=(o, alpha, sd,)) for sd, o in zip(season_discount, models)]
         output = [p.get() for p in results]
@@ -349,9 +349,9 @@ if __name__ ==  '__main__':
             max_acc = output[0][0]
             max_s = output[0][1]
             max_alpha = alpha
-            print 'Found new max: alpha %f, season_discount %f, accuracy %f' % (max_alpha, max_s, max_acc)
+            print ('Found new max: alpha %f, season_discount %f, accuracy %f' % (max_alpha, max_s, max_acc))
         
-        print 'Best found: alpha %f, season_discount %f, val %f' % (max_alpha, max_s, max_acc)
+        print ('Best found: alpha %f, season_discount %f, val %f' % (max_alpha, max_s, max_acc))
     #malpha = m.find_best_alpha()
     #print 'Best alpha: %f' % malpha
     #print m.back_test()

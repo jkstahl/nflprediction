@@ -29,6 +29,7 @@ class deap_learner_model():
         pass
         self.transform()
         self.make_vectors()
+        self.fit()
     
     def __windowed_average__(self, x):
         window = self.pre_compute[len(self.pre_compute)-len(x):] 
@@ -120,11 +121,22 @@ class deap_learner_model():
         self.vects = self.vects[use_columns]
         
         self.vects = self.vects.loc[self.vects['location'] == 1].join(self.vects.loc[self.vects['location'] == 0], rsuffix='_away')
-        # pull out home and away games
-        self.outputs = self.vects['output']
-        self.vects.drop(['output','output_away', 'location', 'location_away'], axis=1, inplace=True)
+        # pull out home and away games and put them together
+        #self.outputs = self.vects['output']
+        self.vects.drop(['output_away', 'location', 'location_away'], axis=1, inplace=True)
         
         pass
+    
+    def fit(self):
+        # shuffle rows
+        
+        # pull out train set
+        
+        # pull out val set
+        
+        # train
+        
+        # validate on val set
 
 if __name__ == '__main__':  
     dl = deap_learner_model()

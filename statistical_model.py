@@ -1,4 +1,5 @@
-import nflgame
+#import nflgame
+#import game_scraper as nflgame
 import numpy as np
 import pandas as pd
 

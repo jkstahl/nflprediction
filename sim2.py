@@ -5,8 +5,7 @@ import matplotlib.pyplot as plt
 from statistical_model import home_model as stat_model 
 from ai_model2 import new_model as nm, new_model
 from modeler import get_team
-import threading
-import cProfile
+
 #from prediction_model_ai import prediction_model_ai
 from optparse import OptionParser
 from multiprocessing.dummy import Pool 
@@ -79,18 +78,18 @@ def eval_games(games, predictions, print_it=False):
 
 def predict_week(year, week, alpha, season_discount, model, print_it = False):
     print ('Getting predictions for: year %d, week %d' % (year, week))
-        
+    import utils
     # simulate all games of a given week with the
     predictions = {} 
     model.load_stats()
     model.process_records(alpha, season_discount)
     model.train(year, week)
     
-    for game in get_games(0, 0):#nflgame.live._games_in_week(year, week):
-        away = game[0]
-        home = game[1]
-        home = get_team(game['home'])
-        away = get_team(game['away'])
+    for home, away in utils.gen_sched(year)[week]:#nflgame.live._games_in_week(year, week):
+        #away = game[0]
+        #home = game[1]
+        #home = get_team(game['home'])
+        #away = get_team(game['away'])
         away_prob, home_prob, predict = model.predict(home, away)
         predictions[home]=(home if predict == 1 else away)
         if print_it:
