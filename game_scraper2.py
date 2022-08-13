@@ -8,7 +8,7 @@ import multiprocessing as mp
 import os, pickle, shelve
 lock = mp.Lock()
 lock_load = mp.Lock()
-START_YEAR = 2018
+START_YEAR = 2010
 
 class Game:
             def __init__(self, game):
@@ -54,7 +54,7 @@ class game_scraper():
             if year_done:
                 self.cache['last_year'] = year
         
-        print (self._stats)
+        #print (self._stats)
         
         #print (self._games[(2020,1)])
         self.teams = [[team] for team in self._teams]
